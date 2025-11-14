@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: bcm-agent
+  labels:
+    app.kubernetes.io/name: bcm-agent
+    app.kubernetes.io/component: monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: bcm-agent
+subjects:
+  - kind: ServiceAccount
+    name: bcm-agent
+    namespace: bcm-agent

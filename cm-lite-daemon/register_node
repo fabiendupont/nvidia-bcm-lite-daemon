@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+
+import argparse
+import logging
+import os
+import socket
+import sys
+
+from cm_lite_daemon.settings import Settings
+from cm_lite_daemon.tools.exit_codes import ExitCodes
+from cm_lite_daemon.tools.generate_certificate import generate_certificate
+from cm_lite_daemon.tools.register_service import enable_systemd_service
+from cm_lite_daemon.tools.register_service import register_service
+from cm_lite_daemon.tools.update_lite_node import update_lite_node
+
+
+def main():
+    root_directory, filename = os.path.split(os.path.realpath(__file__))
+    if root_directory.endswith("/bin"):
+        root_directory = root_directory[0:-4]
+
+    parser = argparse.ArgumentParser(description="Test if cm-lite-daemon can reach head node cmdaemon")
+    parser.add_argument(
+        "--node",
+        metavar="node",
+        type=str,
+        default=socket.gethostname().split(".", 1)[0],
+        help="Force to run as specified lite node",
+    )
+    parser.add_argument("--domain", metavar="domain", type=str, default=None, help="Extra domain names")
+    parser.add_argument(
+        "--interface",
+        metavar="interface",
+        type=str,
+        default=None,
+        help="Interface (or comma separated list) on which to connect to the head node",
+    )
+    parser.add_argument("--vrf", metavar="vrf", type=str, default=None, help="Run in specified VRF ip enviroment")
+    parser.add_argument(
+        "--host",
+        metavar="host",
+        type=str,
+        default="master",
+        help="Head node url (master)",
+    )
+    parser.add_argument("--port", metavar="port", type=int, default=8081, help="Head node port (8081)")
+    parser.add_argument("--bits", metavar="bits", type=int, default=2048, help="bits")
+    parser.add_argument(
+        "--bootstrap-cert",
+        metavar="bootstrap_cert",
+        type=str,
+        default=f"{root_directory}/etc/bootstrap.pem",
+        help="Bootstrap certificate file",
+    )
+    parser.add_argument(
+        "--bootstrap-key",
+        metavar="bootstrap_key",
+        type=str,
+        default=f"{root_directory}/etc/bootstrap.key",
+        help="Bootstrap private key file",
+    )
+    parser.add_argument(
+        "--cert",
+        metavar="cert",
+        type=str,
+        default=f"{root_directory}/etc/cert.pem",
+        help="Certificate file",
+    )
+    parser.add_argument(
+        "--key",
+        metavar="key",
+        type=str,
+        default=f"{root_directory}/etc/cert.key",
+        help="Private key file",
+    )
+    parser.add_argument(
+        "--ca",
+        metavar="ca",
+        type=str,
+        default=f"{root_directory}/etc/cacert.pem",
+        help="CA certificate key file",
+    )
+    parser.add_argument(
+        "--config",
+        metavar="config",
+        type=str,
+        default=f"{root_directory}/etc/config.json",
+        help="Configuration file",
+    )
+    parser.add_argument(
+        "--fake-mac",
+        metavar="fake_mac",
+        type=str,
+        default=None,
+        help="Fake MAC address, testing only",
+    )
+    parser.add_argument(
+        "--network",
+        metavar="network",
+        type=str,
+        default=None,
+        help="Force node to be on the specified network",
+    )
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        default=False,
+        help="Run with debug",
+    )
+    parser.add_argument(
+        "--no-service",
+        dest="service",
+        action="store_false",
+        default=True,
+        help="Do not create a service",
+    )
+    parser.add_argument(
+        "--trace",
+        dest="trace",
+        action="store_true",
+        default=False,
+        help="Trace low level websocket",
+    )
+    parser.add_argument(
+        "--masked",
+        dest="masked",
+        action="store_true",
+        default=False,
+        help="Mask websocket traffic",
+    )
+    parser.add_argument(
+        "--disable-hostname-check",
+        dest="disable_hostname_check",
+        action="store_true",
+        default=False,
+        help="Do not check SSL certificate hostname",
+    )
+    parser.add_argument(
+        "--disable-follow-redirect",
+        dest="disable_follow_redirect",
+        action="store_true",
+        default=False,
+        help="Do not follow forward to shared HA IP",
+    )
+    parser.add_argument(
+        "--disable-cert-check",
+        dest="disable_cert_check",
+        action="store_true",
+        default=False,
+        help="Disable certificate check",
+    )
+    parser.add_argument(
+        "--no-device-update",
+        dest="no_device_update",
+        action="store_true",
+        default=False,
+        help="Do not update the device",
+    )
+    parser.add_argument(
+        "--allow-multiple",
+        dest="allow_multiple",
+        action="store_true",
+        default=False,
+        help="Allow multiple cm-lite-daemon to run on this one node (testing only!)",
+    )
+
+    args = parser.parse_args()
+    settings = Settings(
+        node=args.node,
+        host=args.host,
+        port=args.port,
+        cert_file=args.cert,
+        key_file=args.key,
+        bootstrap_cert_file=args.bootstrap_cert,
+        bootstrap_key_file=args.bootstrap_key,
+        ca_file=args.ca,
+        websocket_masked=args.masked,
+        check_hostname=not args.disable_hostname_check,
+        follow_redirect=not args.disable_follow_redirect,
+        cert_check=not args.disable_cert_check,
+    )
+
+    if args.debug:
+        logging_level = logging.DEBUG
+        logging_format = "%(levelname)-8s (%(asctime)-15s) [%(filename)-20s:%(lineno)3d] %(message)s"
+    else:
+        logging_level = logging.INFO
+        logging_format = "%(levelname)-8s (%(asctime)-15s) %(message)s"
+
+    logging.basicConfig(level=logging_level, format=logging_format)
+
+    logger = logging.getLogger("cm-lite-daemon")
+
+    if settings.check_certificate_files():
+        logger.info("Certificates found")
+    else:
+        if args.domain is not None:
+            domains = args.domain.split(",")
+        else:
+            domains = None
+        exit_code = generate_certificate(settings, logger, args.bits, args.node, domains)
+        if exit_code != ExitCodes.OK:
+            return exit_code
+        # switch from bootstrap to personal certificate
+        settings.reload_certificate()
+
+    try:
+        from cm_lite_daemon.tools.check_connectivity import check_connectivity
+
+        exit_code = check_connectivity(settings, logger)
+        if exit_code != ExitCodes.OK:
+            return exit_code
+    except Exception as e:
+        logger.warning(f"Install incomplete: {str(e)}")
+        return ExitCodes.INSTALL_FAILED
+
+    if not settings.save(args.config):
+        return ExitCodes.SAVE_FAILED
+
+    if not args.no_device_update:
+        if bool(args.interface):
+            if_names = args.interface.split(",")
+        else:
+            if_names = None
+        exit_code = update_lite_node(settings, logger, args.node, args.fake_mac, args.network, if_names)
+        if exit_code != ExitCodes.OK:
+            return exit_code
+
+    if bool(args.vrf):
+        run_env = f"/usr/sbin/ip vrf exec {args.vrf} "
+    else:
+        run_env = ""
+    if args.service:
+        if filename == "register_node":
+            exit_code = register_service(
+                settings, logger, root_directory, run_env, args.node if args.allow_multiple else None
+            )
+            if exit_code != ExitCodes.OK:
+                return exit_code
+        else:
+            logger.warning(f"Unable to register service, not running register_node, but {filename}")
+            return ExitCodes.INSTALL_FAILED
+    else:
+        return enable_systemd_service(logger, run_env)
+
+    return ExitCodes.OK
+
+
+if __name__ == "__main__":
+    if sys.hexversion < 0x3070000:
+        print("Python version too old, 3.7.0 needed")
+        sys.exit(ExitCodes.PYTHON_VERSION)
+    else:
+        sys.exit(main())

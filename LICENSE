@@ -1,0 +1,53 @@
+NVIDIA Proprietary License
+
+SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
+SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+All rights reserved.
+
+NOTICE TO LICENSEE:
+
+This software and documentation (the "Software") is proprietary to NVIDIA
+Corporation and its affiliates ("NVIDIA") and is protected by copyright,
+patent, trademark, and/or other intellectual property laws. The Software
+is provided to you solely for use with NVIDIA Base Command Manager (BCM)
+and related NVIDIA products.
+
+By downloading, installing, copying, or otherwise using the Software, you
+agree to be bound by the terms of this license agreement. If you do not
+agree to the terms of this license agreement, you may not use the Software.
+
+GRANT OF LICENSE:
+
+Subject to the terms and conditions of this Agreement, NVIDIA grants you
+a non-exclusive, non-transferable, revocable license to:
+
+1. Use the Software in conjunction with NVIDIA Base Command Manager
+2. Modify the Software for your internal business purposes
+3. Distribute the Software only within your organization
+
+RESTRICTIONS:
+
+You may not:
+- Distribute the Software to third parties outside your organization
+- Sell, rent, lease, or sublicense the Software
+- Reverse engineer, decompile, or disassemble the Software (except as
+  required by applicable law)
+- Remove or modify any copyright, trademark, or other proprietary notices
+
+DISCLAIMER:
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+NVIDIA BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+TERMINATION:
+
+This license will automatically terminate if you fail to comply with any
+of its terms and conditions. Upon termination, you must destroy all copies
+of the Software.
+
+For questions about licensing, contact NVIDIA Corporation.

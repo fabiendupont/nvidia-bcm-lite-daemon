@@ -1,0 +1,38 @@
+#!/bin/bash
+
+base=$(dirname "$0")
+if [ $(basename "$base") = "bin" ]; then
+  base=$(dirname "$base")
+fi
+if [ -z "$PIDFILE" ]; then
+  source $base/etc/cm-lite-daemon.env
+fi
+if [ ! -e "$PIDFILE" ]; then
+  echo "PID file '$PIDFILE' not found, cm-lite-daemon not running?"
+  exit 2
+fi
+pid=$(cat $PIDFILE)
+if [ -z "$pid" ]; then
+  echo "PID file '$PIDFILE' empty, cm-lite-daemon not running?"
+  exit 2
+fi
+
+if [ "$1" = "debug" -a "$2" = "on" ]; then
+  kill -10 $pid
+elif [ "$1" = "debug" -a "$2" = "off" ]; then
+  kill -12 $pid
+elif [ "$1" = "stop" ]; then
+  kill -2 $pid
+  n=0
+  while kill -0 $pid 2>/dev/null; do
+    sleep 0.25
+    n=$((n+1))
+    if [ $n -gt 60 ]; then
+      echo "Still running with pid $pid after 15 seconds"
+      break
+    fi
+  done
+else
+  echo "Usage $0 <debug on|debug off|stop>"
+  exit 1
+fi

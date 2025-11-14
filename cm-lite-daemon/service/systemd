@@ -1,0 +1,22 @@
+[Unit]
+Description=Bright Computing Cluster Lite Manager daemon
+After=syslog.service network-online.target networking.service time-sync.target
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+StartLimitInterval=1m
+StartLimitBurst=15
+EnvironmentFile=@ROOT@/etc/cm-lite-daemon.env
+ExecStart=@RUN_ENV@@ROOT@/cm-lite-daemon --daemon --pid-file "$PIDFILE"
+ExecStop=@ROOT@/cm-lite-daemon_ctl stop
+# WebSocket stop can take a while (~30s)
+TimeoutStopSec=45
+TasksMax=128
+# some systemd don't support it yet
+MemoryHigh=488M
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

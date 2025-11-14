@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+
+import argparse
+import logging
+import os
+import sys
+
+import urllib3
+
+from cm_lite_daemon.cmdaemon import CMDaemon
+from cm_lite_daemon.settings import Settings
+from cm_lite_daemon.signal_handler import Signal_Handler
+from cm_lite_daemon.ws_connection import WS_Connection
+
+
+def main():
+    root_directory, filename = os.path.split(os.path.realpath(__file__))
+    if root_directory.endswith("/bin"):
+        root_directory = root_directory[0:-4]
+
+    parser = argparse.ArgumentParser(description="Test if cm-lite-daemon can reach head node cmdaemon")
+    parser.add_argument(
+        "--node",
+        metavar="node",
+        type=str,
+        default=None,
+        help="Force to run as specified lite node",
+    )
+    parser.add_argument("--host", metavar="host", type=str, default=None, help="Head node url")
+    parser.add_argument("--port", metavar="port", type=int, default=None, help="Head node port")
+    parser.add_argument("--cert", metavar="cert", type=str, default=None, help="Certificate file")
+    parser.add_argument("--key", metavar="key", type=str, default=None, help="Private key file")
+    parser.add_argument("--ca", metavar="ca", type=str, default=None, help="CA certificate key file")
+    parser.add_argument(
+        "--config",
+        metavar="config",
+        type=str,
+        default=f"{root_directory}/etc/config.json",
+        help="Configuration file",
+    )
+    parser.add_argument(
+        "--daemon",
+        dest="daemon",
+        action="store_true",
+        default=False,
+        help="Run as daemon",
+    )
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        default=False,
+        help="Run with debug",
+    )
+    parser.add_argument(
+        "--trace",
+        dest="trace",
+        action="store_true",
+        default=False,
+        help="Trace low level websocket",
+    )
+    parser.add_argument(
+        "--masked",
+        dest="masked",
+        action="store_true",
+        default=False,
+        help="Mask websocket traffic",
+    )
+    parser.add_argument("--pid-file", dest="pid_file", type=str, default=None, help="Pid file")
+    parser.add_argument(
+        "--disable-hostname-check",
+        dest="disable_hostname_check",
+        action="store_true",
+        default=False,
+        help="Do not check SSL certificate hostname",
+    )
+    parser.add_argument(
+        "--disable-follow-redirect",
+        dest="disable_follow_redirect",
+        action="store_true",
+        default=False,
+        help="Do not follow forward to shared HA IP",
+    )
+    parser.add_argument(
+        "--disable-cert-check",
+        dest="disable_cert_check",
+        action="store_true",
+        default=False,
+        help="Disable certificate check",
+    )
+
+    args = parser.parse_args()
+    settings = Settings(
+        host=args.host,
+        port=args.port,
+        cert_file=args.cert,
+        key_file=args.key,
+        ca_file=args.ca,
+        node=args.node,
+        websocket_masked=args.masked,
+        check_hostname=not args.disable_hostname_check,
+        follow_redirect=not args.disable_follow_redirect,
+        cert_check=not args.disable_cert_check,
+    )
+
+    if args.debug:
+        logging_level = logging.DEBUG
+        logging_format = "%(levelname)-8s (%(asctime)-15s) [%(filename)-20s:%(lineno)3d] %(message)s"
+    else:
+        logging_level = logging.INFO
+        logging_format = "%(levelname)-8s (%(asctime)-15s) %(message)s"
+
+    if args.daemon:
+        if os.getuid() != 0 or os.path.exists("/root/.fake.nvlink"):
+            log_file = f"{root_directory}/log"
+            os.mkdir(log_file, mode=0o750)
+            log_file = f"{log_file}/cm-lite-daemon.log"
+        else:
+            log_file = "/var/log/cm-lite-daemon"
+        logging.basicConfig(
+            filename=log_file,
+            level=logging_level,
+            format=logging_format,
+        )
+    else:
+        logging.basicConfig(level=logging_level, format=logging_format)
+
+    logger = logging.getLogger("cm-lite-daemon")
+
+    if bool(args.config):
+        if settings.load(args.config):
+            logger.info(f"Load config from {args.config}")
+        else:
+            logger.warning(f"Unable to load config file: {args.config}")
+            return 1
+
+    if not settings.check_certificate_files():
+        logger.warning("Unable to find certificates")
+        return 1
+
+    if args.pid_file is not None:
+        try:
+            with open(args.pid_file, "wt") as fout:
+                fout.write("%d\n" % os.getpid())
+        except Exception as e:
+            logger.warning(f"Unable to write pid file: {args.pid_file} ({e})")
+            return 1
+
+    urllib3.disable_warnings()
+
+    exit_code = 0
+    with Signal_Handler() as signal_handler:
+        signal_handler._logger = logger
+
+        logger.info(f"Connecting to {settings.host}:{int(settings.port)}")
+        try:
+            connection = WS_Connection(settings, logger)
+            if not connection.run(args.trace):
+                logger.warning(f"Failed to establish websocket connection to {settings.host}:{int(settings.port)}")
+                connection.stop()
+                checked = {settings.host}
+                exit_code = 2
+                for it in (settings.active, settings.passive, settings.shared):
+                    if bool(it) and it not in checked:
+                        settings.host = it
+                        if connection.run(args.trace):
+                            logger.info(f"Connected to {settings.host}:{int(settings.port)}")
+                            exit_code = 0
+                            break
+                        logger.warning(
+                            f"Failed to establish websocket connection to {settings.host}:{int(settings.port)}"
+                        )
+                        connection.stop()
+                        checked.add(it)
+        except Exception as e:
+            logger.warning(
+                f"Failed to establish websocket connection to {settings.host}:{int(settings.port)} ({str(e)})"
+            )
+            exit_code = 3
+
+        if exit_code == 0:
+            logger.info(f"Starting in {root_directory}")
+            cmdaemon = CMDaemon(settings, connection, logger, root_directory)
+            signal_handler._cmdaemon = cmdaemon
+
+            cmdaemon.start()
+            logger.info("Stopping")
+            connection.stop()
+            logger.debug("Stopped")
+
+    if args.pid_file is not None:
+        try:
+            os.remove(args.pid_file)
+        except Exception as e:
+            logger.warning(f"Unable remove write pid file: {args.pid_file} ({e})")
+
+    return exit_code
+
+
+if __name__ == "__main__":
+    if sys.hexversion < 0x3070000:
+        print("Python version too old, 3.7.0 needed")
+        sys.exit(5)
+    else:
+        sys.exit(main())

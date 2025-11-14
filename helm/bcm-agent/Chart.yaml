@@ -1,0 +1,18 @@
+apiVersion: v2
+name: bcm-agent
+description: NVIDIA BCM Agent for OpenShift - Hardware monitoring and node labeling
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - nvidia
+  - bcm
+  - monitoring
+  - hardware
+  - gpu
+home: https://github.com/nvidia/bcm-agent
+sources:
+  - https://github.com/nvidia/bcm-agent
+maintainers:
+  - name: NVIDIA
+    email: support@nvidia.com

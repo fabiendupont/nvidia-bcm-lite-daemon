@@ -1,0 +1,10 @@
+pyOpenSSL>=21.0.0
+websocket-client
+pyyaml
+psutil
+py-cpuinfo
+uptime
+netifaces
+py-dmidecode
+requests
+natsort

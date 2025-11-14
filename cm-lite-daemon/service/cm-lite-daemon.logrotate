@@ -1,0 +1,6 @@
+su root syslog
+
+/var/log/cm-lite-daemon {
+  monthly
+  missingok
+}

@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+
+import argparse
+import logging
+import os
+import sys
+
+from cm_lite_daemon.settings import Settings
+from cm_lite_daemon.tools.check_connectivity import check_connectivity
+from cm_lite_daemon.tools.exit_codes import ExitCodes
+
+
+def main():
+    root_directory, filename = os.path.split(os.path.realpath(__file__))
+    if root_directory.endswith("/bin"):
+        root_directory = root_directory[0:-4]
+
+    parser = argparse.ArgumentParser(description="Test if cm-lite-daemon can reach head node cmdaemon")
+    parser.add_argument(
+        "--host",
+        metavar="host",
+        type=str,
+        default="master",
+        help="Head node url (master)",
+    )
+    parser.add_argument("--port", metavar="port", type=int, default=8081, help="Head node port (8081)")
+    parser.add_argument(
+        "--cert",
+        metavar="cert",
+        type=str,
+        default=f"{root_directory}/etc/cert.pem",
+        help="Certificate file",
+    )
+    parser.add_argument(
+        "--key",
+        metavar="key",
+        type=str,
+        default=f"{root_directory}/etc/cert.key",
+        help="Private key file",
+    )
+    parser.add_argument(
+        "--ca",
+        metavar="ca",
+        type=str,
+        default=f"{root_directory}/etc/cacert.pem",
+        help="CA certificate key file",
+    )
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        default=False,
+        help="Run with debug",
+    )
+    parser.add_argument(
+        "--masked",
+        dest="masked",
+        action="store_true",
+        default=False,
+        help="Mask websocket traffic",
+    )
+    parser.add_argument(
+        "--disable-hostname-check",
+        dest="disable_hostname_check",
+        action="store_true",
+        default=False,
+        help="Do not check SSL certificate hostname",
+    )
+    parser.add_argument(
+        "--disable-follow-redirect",
+        dest="disable_follow_redirect",
+        action="store_true",
+        default=False,
+        help="Do not follow forward to shared HA IP",
+    )
+    parser.add_argument(
+        "--disable-cert-check",
+        dest="disable_cert_check",
+        action="store_true",
+        default=False,
+        help="Disable certificate check",
+    )
+
+    args = parser.parse_args()
+    settings = Settings(
+        host=args.host,
+        port=args.port,
+        cert_file=args.cert,
+        key_file=args.key,
+        ca_file=args.ca,
+        websocket_masked=args.masked,
+        check_hostname=not args.disable_hostname_check,
+        follow_redirect=not args.disable_follow_redirect,
+        cert_check=not args.disable_cert_check,
+    )
+
+    if args.debug:
+        logging_level = logging.DEBUG
+        logging_format = "%(levelname)-8s (%(asctime)-15s) [%(filename)-20s:%(lineno)3d] %(message)s"
+    else:
+        logging_level = logging.INFO
+        logging_format = "%(levelname)-8s (%(asctime)-15s) %(message)s"
+
+    logging.basicConfig(level=logging_level, format=logging_format)
+
+    logger = logging.getLogger("cm-lite-daemon")
+    return check_connectivity(settings, logger)
+
+
+if __name__ == "__main__":
+    if sys.hexversion < 0x3070000:
+        print("Python version too old, 3.7.0 needed")
+        sys.exit(ExitCodes.PYTHON_VERSION)
+    else:
+        sys.exit(main())

@@ -1,0 +1,122 @@
+#!/bin/bash
+#
+#       /etc/init.d/cmd
+#
+#       cmd is the Cluster Manager 4 cluster management daemon that runs
+#       on all nodes in a cluster. This script can be used to start, stop
+#       and restart the cmd.
+#
+# chkconfig: - 98 01
+# description:  Lite Cluster Management Daemon
+# processname: cm_lite_cmdaemon
+#
+### BEGIN INIT INFO
+# Provides:          lite_cmdaemon
+# Required-Start:    $ALL
+# Should-Start:      $network $syslog
+# Required-Stop:     $ALL
+# Should-Stop:       $network $syslog
+# Default-Start:     3 5
+# Default-Stop:      0 1 2 6
+# Short-Description: Lite Cluster Manager Cluster Management Daemon, Lite CMDaemon.
+# Description:       cmd is the Cluster Manager 4 cluster management daemon that runs
+#      on all nodes in a cluster. This script can be used to start, stop
+#      and restart the cmd.
+### END INIT INFO
+
+# Source function library.
+. /lib/lsb/init-functions
+
+if [ -f /etc/SuSE-release ]; then
+  status()
+  {
+    echo -n "Checking Lite CMDaemon status"
+    /sbin/checkproc cmd
+    rc_status -v
+  }
+fi
+if [ -f /etc/redhat-release ]; then
+  . /etc/init.d/functions
+fi
+
+CTL="@ROOT@/cm-lite-daemon_ctl"
+CMD="@ROOT@/cm-lite-daemon"
+PIDFILE="/var/run/cm-lite-daemon.pid"
+ARGS="--daemon --pid-file ${PIDFILE}"
+
+start() {
+  if [ -e "${PIDFILE}" ]; then
+    mypid=$(cat "${PIDFILE}" 2>/dev/null)
+    if /bin/kill -0 ${mypid} &> /dev/null; then
+      if /bin/ps -p ${mypid} | grep \ python$ > /dev/null; then
+        log_failure_msg "Another instance of Lite CMDaemon is still running."
+        return 1
+      fi
+    fi
+  fi
+
+  echo -n "Starting Lite CMDaemon ..."
+  setsid "${CMD}" "${ARGS}" "${CMD_DIR}" "${PIDFILE}" >/dev/null 2>&1 &
+  ret=$?
+  wrapper_pid="${!}"
+  if [ $ret -eq 0 ]; then
+    log_success_msg
+  else
+    log_failure_msg
+  fi
+  [ $ret -eq 0 ] && touch /var/lock/subsys/lite_cmdaemon
+  return $ret
+}
+
+stop() {
+  $CTL stop
+  ret=$?
+  if [ "$ret" -eq "0" ]; then
+    log_success_msg
+  else
+    log_failure_msg
+  fi
+  return $ret
+}
+
+restart(){
+  stop
+  start
+}
+
+debugon(){
+  $CTL debug on
+  return $?
+}
+
+debugoff(){
+  $CTL debug off
+  return $?
+}
+
+# See how we were called.
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  status)
+    status cm-lite-daemon
+    ;;
+  restart)
+    restart
+    ;;
+  debugon)
+    debugon
+    ;;
+  debugoff)
+    debugoff
+    ;;
+  *)
+    echo $"Usage: $0 {start|stop|status|restart|debugon|debugoff}"
+    exit 1
+esac
+
+exit $?

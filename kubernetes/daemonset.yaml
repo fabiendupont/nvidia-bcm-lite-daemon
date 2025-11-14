@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: bcm-agent
+  namespace: bcm-agent
+  labels:
+    app.kubernetes.io/name: bcm-agent
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bcm-agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bcm-agent
+        app.kubernetes.io/component: monitoring
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: bcm-agent
+      hostNetwork: true
+      hostPID: true
+      hostIPC: true
+
+      # Node selector - only run on nodes you want to monitor
+      # nodeSelector:
+      #   node-role.kubernetes.io/worker: ""
+
+      # Tolerations to run on all nodes including masters
+      tolerations:
+        - operator: Exists
+
+      # Priority class for system-level monitoring
+      priorityClassName: system-node-critical
+
+      containers:
+        - name: bcm-agent
+          image: ghcr.io/fabiendupont/nvidia-bcm-lite-daemon:latest
+          imagePullPolicy: IfNotPresent
+
+          # Pass node name to container
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CHECK_INTERVAL
+              valueFrom:
+                configMapKeyRef:
+                  name: bcm-agent-config
+                  key: CHECK_INTERVAL
+            - name: LABEL_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: bcm-agent-config
+                  key: LABEL_PREFIX
+            - name: ENABLE_LABELING
+              valueFrom:
+                configMapKeyRef:
+                  name: bcm-agent-config
+                  key: ENABLE_LABELING
+            - name: METRICS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: bcm-agent-config
+                  key: METRICS_PORT
+            - name: HEALTH_GROUPS
+              valueFrom:
+                configMapKeyRef:
+                  name: bcm-agent-config
+                  key: HEALTH_GROUPS
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: bcm-agent-config
+                  key: LOG_LEVEL
+
+          # Security context - needs privileged for hardware access
+          securityContext:
+            privileged: true
+            runAsUser: 0  # Root required for IPMI, GPU access
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - SYS_RAWIO
+                - NET_ADMIN
+
+          # Resource limits
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # Volume mounts for hardware access
+          volumeMounts:
+            # Host devices
+            - name: dev
+              mountPath: /dev
+            # Host sys for hardware info
+            - name: sys
+              mountPath: /sys
+            # Host proc for system info
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            # Firmware
+            - name: firmware
+              mountPath: /lib/firmware
+              readOnly: true
+            # Results directory
+            - name: results
+              mountPath: /results
+
+          # Liveness probe
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9100
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          # Readiness probe
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9100
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: firmware
+          hostPath:
+            path: /lib/firmware
+        - name: results
+          emptyDir: {}
