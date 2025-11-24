@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.log
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# Container images
+*.tar
+*.tar.gz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# NVIDIA proprietary files (must be obtained from BCM installation)
+cm-lite-daemon/
+cm-lite-daemon.zip
+
+# Certificates and secrets
+*.pem
+*.key
+*.crt
+!docs/**/*.pem
+
+# Helm
+helm/*/charts/
+helm/*/*.tgz
+
+# Kubernetes
+*.kubeconfig
+
+# OS
+.DS_Store
+Thumbs.db

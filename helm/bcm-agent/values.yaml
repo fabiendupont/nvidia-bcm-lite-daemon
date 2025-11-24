@@ -1,0 +1,149 @@
+# Default values for bcm-agent
+# This is a YAML-formatted file.
+
+# Image configuration
+# IMPORTANT: No public image exists. You must build and push to your own registry.
+# See README.md for build instructions.
+image:
+  repository: "registry.example.com/bcm-agent"  # REQUIRED: Change to your registry
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# BCM Agent configuration
+config:
+  # BCM head node configuration
+  bcm:
+    # BCM head node hostname or IP
+    host: "master"
+    # BCM cmdaemon port
+    port: 8081
+    # Path to config file (optional, overrides host/port if present)
+    configFile: ""
+
+  # Kubernetes integration configuration
+  kubernetes:
+    # Sync interval in seconds (how often to update node labels)
+    syncInterval: 300
+    # Kubernetes label prefix for BCM labels
+    labelPrefix: "bcm.nvidia.com"
+    # Enable node labeling
+    enableLabeling: true
+    # Disable labeling (metrics only mode)
+    disableLabeling: false
+
+  # Certificate paths (mounted from Secret)
+  certificates:
+    certFile: "/etc/bcm-agent/certs/cert.pem"
+    keyFile: "/etc/bcm-agent/certs/cert.key"
+    caFile: "/etc/bcm-agent/certs/cacert.pem"
+
+  # Log level and debugging
+  debug: false
+  logLevel: "info"
+
+# Prometheus metrics configuration
+metrics:
+  enabled: true
+  port: 9100
+  service:
+    type: ClusterIP
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9100"
+
+# Resource limits and requests
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+# Node selector for targeting specific nodes
+nodeSelector: {}
+  # Example: Only run on worker nodes
+  # node-role.kubernetes.io/worker: ""
+
+# Tolerations for running on tainted nodes
+tolerations:
+  # Run on all nodes by default
+  - operator: Exists
+
+# Affinity rules
+affinity: {}
+
+# Priority class for the DaemonSet
+priorityClassName: system-node-critical
+
+# Security context (privileged required for hardware access)
+securityContext:
+  privileged: true
+  runAsUser: 0
+  capabilities:
+    add:
+      - SYS_ADMIN
+      - SYS_RAWIO
+      - NET_ADMIN
+
+# Update strategy for DaemonSet
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+
+# Host network access
+hostNetwork: true
+hostPID: true
+hostIPC: true
+
+# Probes configuration
+livenessProbe:
+  httpGet:
+    path: /
+    port: metrics
+  initialDelaySeconds: 60
+  periodSeconds: 60
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: metrics
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 5
+
+# Additional annotations for pods
+podAnnotations: {}
+
+# Additional labels for pods
+podLabels: {}
+
+# Bootstrap certificate configuration
+# The bootstrap certificate is used to auto-generate per-node certificates
+# Each node will request its own unique certificate on first startup
+#
+# Setup:
+# 1. Create bootstrap certificate on BCM head node (limited permissions, only for cert requests)
+# 2. Create Kubernetes Secret with bootstrap certificates:
+#    kubectl create secret generic bcm-bootstrap-cert \
+#      --from-file=cacert.pem=/cm/local/apps/cmd/etc/cacert.pem \
+#      --from-file=cert.pem=/path/to/bootstrap/cert.pem \
+#      --from-file=cert.key=/path/to/bootstrap/cert.key
+#
+certificates:
+  # Name of Secret containing bootstrap certificate
+  # The Secret must contain: cacert.pem, cert.pem, cert.key
+  secretName: "bcm-bootstrap-cert"

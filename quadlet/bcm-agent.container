@@ -1,0 +1,89 @@
+# Quadlet configuration for BCM Agent
+# Deploy to: /etc/containers/systemd/bcm-agent.container
+#
+# After deployment, run:
+#   systemctl daemon-reload
+#   systemctl enable --now bcm-agent.service
+
+[Unit]
+Description=BCM Agent - NVIDIA Base Command Manager Integration
+Documentation=https://github.com/nvidia/bcm-agent
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+# Container image (update with your registry/tag)
+Image=quay.io/nvidia/bcm-agent:1.0.0
+
+# Automatic updates (optional - pulls latest on restart)
+# AutoUpdate=registry
+
+# Container name
+ContainerName=bcm-agent
+
+# Environment variables
+Environment=NODE_NAME=%H
+Environment=BCM_HOST=bcmhead
+Environment=BCM_PORT=8081
+Environment=CERT_FILE=/etc/bcm-agent/certs/cert.pem
+Environment=KEY_FILE=/etc/bcm-agent/certs/cert.key
+Environment=CA_FILE=/etc/bcm-agent/certs/cacert.pem
+Environment=SYNC_INTERVAL=300
+Environment=LABEL_PREFIX=bcm.nvidia.com
+Environment=METRICS_PORT=9100
+Environment=LOG_LEVEL=info
+# Uncomment for debug logging:
+# Environment=DEBUG=true
+
+# Network configuration
+Network=host
+HostName=%H
+
+# Security and access
+SecurityLabelDisable=true
+User=0
+Group=0
+
+# Capabilities (for hardware access)
+AddCapability=SYS_ADMIN
+AddCapability=SYS_RAWIO
+AddCapability=NET_ADMIN
+
+# Volume mounts
+Volume=/etc/bcm-agent/certs:/etc/bcm-agent/certs:ro,z
+Volume=/dev:/dev:rw
+Volume=/sys:/sys:rw
+Volume=/proc:/host/proc:ro
+Volume=/lib/firmware:/lib/firmware:ro
+
+# Logging
+Volume=/var/log/bcm-agent:/var/log/bcm-agent:rw,z
+
+# PID namespace
+PodmanArgs=--pid=host
+PodmanArgs=--ipc=host
+PodmanArgs=--privileged
+
+# Health check
+HealthCmd=/bin/sh -c "test -f /var/run/bcm-agent/cm-lite-daemon.pid && kill -0 $(cat /var/run/bcm-agent/cm-lite-daemon.pid)"
+HealthInterval=60s
+HealthTimeout=10s
+HealthRetries=3
+
+# Expose Prometheus metrics
+PublishPort=9100:9100
+
+[Service]
+# Restart policy
+Restart=always
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=45
+
+# Resource limits (optional)
+MemoryHigh=488M
+MemoryMax=512M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target default.target

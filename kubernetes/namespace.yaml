@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bcm-agent
+  labels:
+    app.kubernetes.io/name: bcm-agent
+    app.kubernetes.io/component: monitoring

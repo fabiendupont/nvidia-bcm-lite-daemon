@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bcm-agent-config
+  namespace: bcm-agent
+  labels:
+    app.kubernetes.io/name: bcm-agent
+    app.kubernetes.io/component: monitoring
+data:
+  # Health check interval in seconds
+  CHECK_INTERVAL: "300"
+
+  # Kubernetes label prefix for BCM labels
+  LABEL_PREFIX: "bcm.nvidia.com"
+
+  # Enable node labeling
+  ENABLE_LABELING: "true"
+
+  # Prometheus metrics port
+  METRICS_PORT: "9100"
+
+  # Health check groups to run (comma-separated: GPU,Fabric,Platform)
+  # Empty = run all groups
+  HEALTH_GROUPS: ""
+
+  # Log level
+  LOG_LEVEL: "info"

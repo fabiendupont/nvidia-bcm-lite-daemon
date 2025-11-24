@@ -1,0 +1,83 @@
+BCM Agent for Kubernetes
+Copyright 2025 Fabien Dupont <fdupont@redhat.com>
+
+This project contains Kubernetes/OpenShift integration code for NVIDIA Base
+Command Manager (BCM). The integration code (src/, helm/, kubernetes/, docs/,
+scripts/) is licensed under the Apache License 2.0 (see LICENSE file).
+
+===============================================================================
+
+THIRD-PARTY DEPENDENCIES
+
+This software requires NVIDIA's proprietary cm-lite-daemon, which is NOT
+included in this repository and must be obtained separately from your NVIDIA
+Base Command Manager installation.
+
+-------------------------------------------------------------------------------
+
+NVIDIA cm-lite-daemon
+Copyright (c) 2022-2025 NVIDIA CORPORATION & AFFILIATES
+License: LicenseRef-NvidiaProprietary
+
+The cm-lite-daemon is proprietary software owned by NVIDIA CORPORATION.
+All intellectual property and proprietary rights in and to this material,
+related documentation and any modifications thereto are retained by NVIDIA.
+
+Any use, reproduction, disclosure or distribution of cm-lite-daemon and related
+documentation requires an express license agreement from NVIDIA CORPORATION.
+
+The cm-lite-daemon must be obtained from your NVIDIA Base Command Manager
+installation, typically located at:
+  /cm/shared/apps/cm-lite-daemon-dist/cm-lite-daemon.zip
+
+For licensing questions regarding cm-lite-daemon, contact NVIDIA Corporation.
+
+===============================================================================
+
+BUILD REQUIREMENTS
+
+To build container images using this project, you must:
+
+1. Have a valid NVIDIA Base Command Manager installation
+2. Have access to the cm-lite-daemon distribution
+3. Copy cm-lite-daemon.zip to the build context before building
+4. Build the container image on a system with access to BCM files
+5. NOT redistribute the resulting container image publicly
+
+The container image built from this project contains NVIDIA proprietary
+software and is subject to NVIDIA's licensing terms.
+
+===============================================================================
+
+PYTHON DEPENDENCIES
+
+This project uses the following open-source Python packages:
+
+- kubernetes (Apache 2.0)
+- prometheus-client (Apache 2.0)
+- pyOpenSSL (Apache 2.0)
+- websocket-client (Apache 2.0 / BSD / LGPL)
+- pyyaml (MIT)
+- psutil (BSD)
+- py-cpuinfo (MIT)
+- uptime (BSD)
+- netifaces (MIT)
+- py-dmidecode (GPLv2)
+- requests (Apache 2.0)
+- natsort (MIT)
+
+See individual package licenses for full terms.
+
+===============================================================================
+
+DISCLAIMER
+
+This project is an independent integration wrapper and is not officially
+supported or endorsed by NVIDIA Corporation. Use at your own risk.
+
+For support or questions about this integration:
+  Contact: Fabien Dupont <fdupont@redhat.com>
+
+For support or questions about NVIDIA Base Command Manager:
+  Contact: NVIDIA Support
+  Website: https://docs.nvidia.com/base-command-manager/

@@ -1,0 +1,21 @@
+apiVersion: v2
+name: bcm-agent
+description: Kubernetes Integration for NVIDIA BCM - Hardware monitoring and node labeling
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - nvidia
+  - bcm
+  - base-command-manager
+  - monitoring
+  - hardware
+  - gpu
+  - kubernetes
+  - openshift
+home: https://github.com/fabiendupont/nvidia-bcm-lite-daemon
+sources:
+  - https://github.com/fabiendupont/nvidia-bcm-lite-daemon
+maintainers:
+  - name: Fabien Dupont
+    email: fdupont@redhat.com

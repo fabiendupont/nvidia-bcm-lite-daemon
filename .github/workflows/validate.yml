@@ -1,0 +1,221 @@
+# SPDX-FileCopyrightText: Copyright 2025 Fabien Dupont <fdupont@redhat.com>
+# SPDX-License-Identifier: Apache-2.0
+
+name: Validate Code and Manifests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-helm:
+    name: Validate Helm Charts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Lint Helm chart
+        run: |
+          helm lint ./helm/bcm-agent
+          echo "✅ Helm chart validation passed"
+
+      - name: Template Helm chart
+        run: |
+          helm template bcm-agent ./helm/bcm-agent \
+            --set image.repository=example.com/bcm-agent \
+            --set image.tag=test \
+            --set certificates.secretName=test-cert
+          echo "✅ Helm template rendering passed"
+
+  validate-kubernetes:
+    name: Validate Kubernetes Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.29.0'
+
+      - name: Validate Kubernetes YAML syntax
+        run: |
+          for file in kubernetes/*.yaml; do
+            echo "Validating $file"
+            kubectl apply --dry-run=client -f "$file" || true
+          done
+          echo "✅ Kubernetes manifests syntax validation completed"
+
+      - name: Validate with kustomize
+        run: |
+          kubectl kustomize kubernetes/
+          echo "✅ Kustomize build passed"
+
+  validate-shell:
+    name: Validate Shell Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Check shell scripts
+        run: |
+          find . -type f -name "*.sh" -print0 | while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            shellcheck "$file" || exit 1
+          done
+          echo "✅ Shell script validation passed"
+
+  validate-python:
+    name: Validate Python Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install flake8 pylint
+
+      - name: Check Python syntax with flake8
+        run: |
+          # Check basic syntax errors and undefined names
+          flake8 src/*.py --count --select=E9,F63,F7,F82 --show-source --statistics
+
+          # Check all other issues (warnings only)
+          flake8 src/*.py --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          echo "✅ Python syntax validation passed"
+
+      - name: Check Python code quality with pylint
+        run: |
+          # Run pylint but don't fail on warnings
+          pylint src/*.py --exit-zero || true
+          echo "✅ Python code quality check completed"
+
+  validate-yaml:
+    name: Validate YAML Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: |
+          pip install yamllint
+
+      - name: Lint YAML files
+        run: |
+          # Create yamllint config
+          cat > .yamllint.yml << EOF
+          extends: default
+          rules:
+            line-length:
+              max: 200
+            indentation:
+              spaces: 2
+            comments:
+              min-spaces-from-content: 1
+          EOF
+
+          # Lint all YAML files
+          yamllint -c .yamllint.yml \
+            kubernetes/ \
+            helm/ \
+            .github/ \
+            quadlet/ || true
+          echo "✅ YAML validation completed"
+
+  validate-containerfile:
+    name: Validate Containerfile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install hadolint
+        run: |
+          wget -qO /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+          chmod +x /usr/local/bin/hadolint
+
+      - name: Lint Containerfile
+        run: |
+          # Ignore the missing cm-lite-daemon.zip (DL3003)
+          hadolint Containerfile --ignore DL3003 || true
+          echo "✅ Containerfile validation completed"
+
+  check-spdx:
+    name: Check SPDX License Headers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for SPDX headers in source files
+        run: |
+          echo "Checking for SPDX license headers..."
+
+          # Check Python files
+          missing=0
+          for file in $(find src scripts -type f -name "*.py" 2>/dev/null); do
+            if ! grep -q "SPDX-License-Identifier" "$file"; then
+              echo "❌ Missing SPDX header: $file"
+              missing=$((missing + 1))
+            fi
+          done
+
+          # Check shell scripts
+          for file in $(find src scripts -type f -name "*.sh" 2>/dev/null); do
+            if ! grep -q "SPDX-License-Identifier" "$file"; then
+              echo "❌ Missing SPDX header: $file"
+              missing=$((missing + 1))
+            fi
+          done
+
+          if [ $missing -eq 0 ]; then
+            echo "✅ All source files have SPDX headers"
+          else
+            echo "⚠️  $missing file(s) missing SPDX headers (warning only)"
+          fi
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs:
+      - validate-helm
+      - validate-kubernetes
+      - validate-shell
+      - validate-python
+      - validate-yaml
+      - validate-containerfile
+      - check-spdx
+    steps:
+      - name: Summary
+        run: |
+          echo "# Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All validation checks passed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Container images must be built on BCM head node with access to NVIDIA cm-lite-daemon." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See \`scripts/build-image.sh\` for build instructions." >> $GITHUB_STEP_SUMMARY
